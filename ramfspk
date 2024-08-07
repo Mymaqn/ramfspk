@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+import subprocess
+import argparse
+import os
+import sys
+import shlex
+
+RAMFS_FILE = 0
+RAMFS_DIR = 1
+
+parser = argparse.ArgumentParser(prog="ramfspk", description="Packs a ramfs given an archive name and multiple folders")
+
+parser.add_argument("archive_name", type=str, help="The archive to pack everything into")
+parser.add_argument("files", type=str, help="File(s) or folder(s) to pack, variable amount of arguments", nargs="+")
+
+args = parser.parse_args()
+
+output_archive = args.archive_name
+
+# We'll be using it as our output folder, so let's make sure there are no bash specific chars, okay?
+output_archive = shlex.quote(os.path.realpath(output_archive))
+
+def pack_directory(dir):
+    os.chdir(dir)
+    output = subprocess.check_output(f"find * | cpio --format=newc -oA -F {output_archive}", stderr=subprocess.STDOUT, shell=True)
+
+def pack_file(file):
+    dir, filename = os.path.split(file)
+    os.chdir(dir)
+    output = subprocess.check_output(f"echo \"{shlex.quote(filename)}\" | cpio --format=newc -oA -F {output_archive}")
+
+files = args.files
+
+# Check if all files/folders are valid and append them with their type
+full_files = []
+
+for file in files:
+    full_name = os.path.realpath(file)
+    if not os.path.exists(full_name):
+        print(f"Error: {full_name} does not exist",file=sys.stderr)
+        exit(1)
+    # Next we check if it's a directory. If it is not a directory we treat it as a file
+    file_dict = {
+        "path":full_name,
+        "type":RAMFS_FILE
+    }
+    if os.path.isdir(full_name):
+        file_dict["type"] = RAMFS_DIR
+
+    full_files.append(file_dict)
+
+
+# Create an empty archive
+output = subprocess.check_output(f"echo | cpio --create --format=newc > {output_archive}", stderr=subprocess.STDOUT, shell=True)
+
+if b'1 block' not in output:
+    print(f"Something went wrong creating the cpio archive:",file=sys.stderr)
+    print(output.decode(),file=sys.stderr)
+    exit(1)
+
+
+for path in full_files:
+    if path["type"] == RAMFS_DIR:
+        pack_directory(path["path"])
+    elif path["type"] == RAMFS_FILE:
+        pack_file(path["path"])
+    
+
+
+
+
+
+
+
+
