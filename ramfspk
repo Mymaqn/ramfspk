@@ -22,12 +22,12 @@ output_archive = shlex.quote(os.path.realpath(output_archive))
 
 def pack_directory(dir):
     os.chdir(dir)
-    output = subprocess.check_output(f"find * | cpio --format=newc -oA -F {output_archive}", stderr=subprocess.STDOUT, shell=True)
+    output = subprocess.check_output(f"find * | cpio --format=newc -oAa -R 0:0 -F {output_archive}", stderr=subprocess.STDOUT, shell=True)
 
 def pack_file(file):
     dir, filename = os.path.split(file)
     os.chdir(dir)
-    output = subprocess.check_output(f"echo \"{shlex.quote(filename)}\" | cpio --format=newc -oA -F {output_archive}")
+    output = subprocess.check_output(f"echo \"{shlex.quote(filename)}\" | cpio --format=newc -oAa -R 0:0 -F {output_archive}")
 
 files = args.files
 
